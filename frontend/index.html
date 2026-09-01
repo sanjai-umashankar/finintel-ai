@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FinIntel AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="./chart.umd.min.js"></script>
+<script>
+    if (typeof Chart === "undefined") {
+        console.error("Chart.js failed to load.");
+    } else {
+        console.log("Chart.js loaded successfully:", Chart.version);
+    }
+</script>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #131a2e;
+    --panel-2: #1a2338;
+    --border: #263252;
+    --text: #e7ecf7;
+    --muted: #93a0bd;
+    --accent: #5b8def;
+    --green: #34d399;
+    --red: #f87171;
+    --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+  }
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--panel);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:18px; }
+  header .brand .dot { width:10px;height:10px;border-radius:50%; background: var(--accent); }
+  nav { display:flex; gap:4px; flex-wrap: wrap; }
+  nav button {
+    background: transparent; border: none; color: var(--muted); padding: 8px 14px;
+    border-radius: 8px; cursor: pointer; font-size: 14px;
+  }
+  nav button.active { background: var(--panel-2); color: var(--text); font-weight:600; }
+  nav button:hover { color: var(--text); }
+  .api-row { display:flex; align-items:center; gap:8px; font-size:12px; color: var(--muted); }
+  .api-row input { background: var(--panel-2); border:1px solid var(--border); color:var(--text); padding:5px 8px; border-radius:6px; width:190px; font-size:12px;}
+  main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+  .tab { display:none; }
+  .tab.active { display:block; animation: fade .15s ease-in; }
+  @keyframes fade { from{opacity:0} to{opacity:1} }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px; margin-bottom: 16px;
+  }
+  .card h2 { margin: 0 0 4px 0; font-size: 16px; }
+  .card .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  .grid { display:grid; gap: 16px; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 900px) { .grid-2, .grid-4 { grid-template-columns: 1fr; } }
+  label { display:block; font-size: 12px; color: var(--muted); margin-bottom: 4px; margin-top:10px; }
+  input, select {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 10px; border-radius: 8px; font-size: 14px;
+  }
+  button.primary {
+    background: var(--accent); color: white; border: none; padding: 10px 16px;
+    border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; margin-top: 14px;
+  }
+  button.primary:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost {
+    background: transparent; border: 1px solid var(--border); color: var(--text);
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  button.danger { color: var(--red); border-color: rgba(248,113,113,.3); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  }
+  .badge.bullish, .badge.positive, .badge.buy, .badge.accumulate { background: rgba(52,211,153,.15); color: var(--green); }
+  .badge.bearish, .badge.negative, .badge.sell, .badge.reduce { background: rgba(248,113,113,.15); color: var(--red); }
+  .badge.neutral, .badge.hold, .badge.moderate { background: rgba(251,191,36,.15); color: var(--amber); }
+  .badge.unknown, .badge.low { background: rgba(147,160,189,.15); color: var(--muted); }
+  .badge.high { background: rgba(248,113,113,.15); color: var(--red); }
+  .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .status-dot.ok { background: var(--green); }
+  .status-dot.bad { background: var(--red); }
+  .confidence-bar { background: var(--panel-2); border-radius: 999px; height: 8px; overflow: hidden; margin: 8px 0; }
+  .confidence-bar > div { height: 100%; background: var(--accent); }
+  .factor { font-size: 13px; color: var(--muted); padding: 3px 0; }
+  .factor::before { content: "• "; color: var(--accent); }
+  .final-card { border: 1px solid var(--accent); background: linear-gradient(180deg, rgba(91,141,239,.08), transparent); }
+  .final-signal { font-size: 42px; font-weight: 800; margin: 4px 0; }
+  .why-item { padding: 4px 0; font-size: 14px; }
+  .why-item.pos::before { content: "✓ "; color: var(--green); }
+  .why-item.risk::before { content: "⚠ "; color: var(--amber); }
+  .pill-row { display:flex; gap:8px; flex-wrap: wrap; margin: 8px 0; }
+  .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align:center; }
+  .muted { color: var(--muted); }
+  .toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 100; display:flex; flex-direction:column; gap:8px; }
+  .toast { background: var(--panel-2); border: 1px solid var(--border); padding: 10px 16px; border-radius: 10px; font-size: 13px; animation: fade .2s; }
+  .toast.error { border-color: rgba(248,113,113,.4); color: var(--red); }
+  .skeleton { background: linear-gradient(90deg, var(--panel-2) 25%, #202b47 50%, var(--panel-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 8px; height: 80px; }
+  @keyframes shimmer { 0%{background-position: 200% 0} 100%{background-position: -200% 0} }
+  .demo-flag { font-size: 11px; color: var(--amber); border: 1px solid rgba(251,191,36,.3); padding: 1px 6px; border-radius: 6px; margin-left: 6px; }
+  .disclaimer { font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 14px; padding-top: 10px; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 14px; margin-top: 10px; }
+  pre { background: var(--panel-2); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 12px; color: var(--muted); }
+  .chip { font-size:11px; padding:2px 8px; border-radius:6px; border:1px solid var(--border); color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><div class="dot"></div> FinIntel AI</div>
+  <nav id="nav"></nav>
+  <div class="api-row">
+    <span id="userChip" class="chip">No profile selected</span>
+    <span>API:</span>
+    <input id="apiBase" value="http://localhost:8000">
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= PROFILE ================= -->
+  <section class="tab" id="tab-profile">
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>Create Profile</h2>
+        <div class="sub">Your risk tolerance and horizon personalize every recommendation.</div>
+        <label>Name</label>
+        <input id="pf-name" placeholder="e.g. Asha Rao">
+        <label>Risk Tolerance</label>
+        <select id="pf-risk">
+          <option>Conservative</option>
+          <option selected>Moderate</option>
+          <option>Aggressive</option>
+        </select>
+        <label>Investment Horizon</label>
+        <select id="pf-horizon">
+          <option>Short Term</option>
+          <option selected>Medium Term</option>
+          <option>Long Term</option>
+        </select>
+        <button class="primary" onclick="createProfile()">Create Profile</button>
+      </div>
+      <div class="card">
+        <h2>Existing Profiles</h2>
+        <div class="sub">Select one to make it the active user.</div>
+        <div id="profileList"><div class="empty">No profiles yet.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PORTFOLIO ================= -->
+  <section class="tab" id="tab-portfolio">
+    <div class="card">
+      <h2>Add Holding</h2>
+      <div class="grid grid-4">
+        <div><label>Symbol</label><select id="port-symbol"></select></div>
+        <div><label>Quantity</label><input id="port-qty" type="number" value="10"></div>
+        <div><label>Average Price</label><input id="port-price" type="number" value="1000"></div>
+        <div style="display:flex; align-items:flex-end;"><button class="primary" style="margin-top:10px; width:100%" onclick="addPortfolioItem()">Add</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Portfolio</h2>
+      <div class="sub">Allocation % is computed live from quantity × average price.</div>
+      <div id="portfolioTable"><div class="empty">No holdings yet — add one above.</div></div>
+    </div>
+  </section>
+
+  <!-- ================= WATCHLIST ================= -->
+  <section class="tab" id="tab-watchlist">
+    <div class="card">
+      <h2>Watchlist</h2>
+      <div class="grid grid-4">
+        <div style="grid-column: span 3;"><label>Symbol</label><select id="watch-symbol"></select></div>
+        <div style="display:flex; align-items:flex-end;"><button class="primary" style="margin-top:10px; width:100%" onclick="addWatchlistItem()">Add</button></div>
+      </div>
+      <div id="watchlistTable" style="margin-top:16px;"><div class="empty">No watchlist items yet.</div></div>
+    </div>
+  </section>
+
+  <!-- ================= DOCUMENTS ================= -->
+  <section class="tab" id="tab-documents">
+    <div class="card">
+      <h2>Upload Financial Document</h2>
+      <div class="sub">Feeds the Fundamental Agent's RAG pipeline. .txt works out of the box; .pdf needs <code>pypdf</code> installed on the backend.</div>
+      <div class="grid grid-2">
+        <div><label>Stock Symbol</label><select id="doc-symbol"></select></div>
+        <div><label>File</label><input id="doc-file" type="file"></div>
+      </div>
+      <button class="primary" onclick="uploadDocument()">Upload &amp; Process</button>
+      <div id="uploadStatus"></div>
+    </div>
+    <div class="card">
+      <h2>Uploaded Documents</h2>
+      <div id="documentsTable"><div class="empty">No documents uploaded yet.</div></div>
+    </div>
+  </section>
+
+  <!-- ================= ANALYZE ================= -->
+  <section class="tab" id="tab-analyze">
+    <div class="card">
+      <h2>Search Stock</h2>
+      <div class="grid grid-4">
+        <div style="grid-column: span 3;"><label>Symbol</label><select id="stock-symbol"></select></div>
+        <div style="display:flex; align-items:flex-end;"><button class="primary" style="margin-top:10px; width:100%" onclick="loadStock()">Load</button></div>
+      </div>
+    </div>
+
+    <div id="stockOverview"></div>
+
+    <div class="card" style="text-align:center;" id="analyzeCard" hidden>
+      <button class="primary" style="font-size:16px; padding:14px 32px;" onclick="analyzeStock()" id="analyzeBtn">ANALYSE STOCK</button>
+      <div class="sub" style="margin-top:8px;">Runs Technical, Fundamental and Sentiment agents in parallel, then Risk → Synthesis.</div>
+    </div>
+
+    <div id="analysisLoading" hidden>
+      <div class="grid grid-4">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </div>
+
+    <div id="analysisResults"></div>
+  </section>
+
+  <!-- ================= HISTORY ================= -->
+  <section class="tab" id="tab-history">
+    <div class="card">
+      <h2>Analysis History</h2>
+      <div id="historyTable"><div class="empty">No past analyses for this profile yet.</div></div>
+    </div>
+    <div id="historyDetail"></div>
+  </section>
+
+  <!-- ================= METRICS ================= -->
+  <section class="tab" id="tab-metrics">
+    <div class="card">
+      <h2>System Metrics</h2>
+      <div id="metricsGrid" class="grid grid-4"></div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+const SYMBOLS_FALLBACK = ["RELIANCE", "TCS", "HDFCBANK"];
+let currentUser = null;     // {id, name, risk_tolerance, investment_horizon}
+let priceChart = null;
+let allocChart = null;
+
+const TABS = ["profile","portfolio","watchlist","documents","analyze","history","metrics"];
+const TAB_LABELS = {profile:"Profile", portfolio:"Portfolio", watchlist:"Watchlist", documents:"Documents", analyze:"Analyze", history:"History", metrics:"Metrics"};
+
+function apiBase() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
+
+function toast(msg, isError=false) {
+  const wrap = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+async function api(path, opts={}) {
+  const res = await fetch(apiBase() + path, {
+    headers: opts.body instanceof FormData ? {} : {'Content-Type':'application/json'},
+    ...opts,
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { const j = await res.json(); detail = j.detail || detail; } catch(e) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+// ---------------- Nav ----------------
+function buildNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = TABS.map(t => `<button id="navbtn-${t}" onclick="showTab('${t}')">${TAB_LABELS[t]}</button>`).join('');
+}
+function showTab(name) {
+  TABS.forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('active', t === name);
+    document.getElementById('navbtn-'+t).classList.toggle('active', t === name);
+  });
+  if (name === 'history') loadHistory();
+  if (name === 'metrics') loadMetrics();
+}
+
+function fillSymbolSelects(symbols) {
+  ["port-symbol","watch-symbol","doc-symbol","stock-symbol"].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = symbols.map(s => `<option value="${s}">${s}</option>`).join('');
+  });
+}
+
+function updateUserChip() {
+  const chip = document.getElementById('userChip');
+  chip.textContent = currentUser ? `${currentUser.name} · ${currentUser.risk_tolerance} · ${currentUser.investment_horizon}` : "No profile selected";
+}
+
+// ---------------- Profile ----------------
+async function createProfile() {
+  const name = document.getElementById('pf-name').value.trim();
+  if (!name) { toast("Enter a name first.", true); return; }
+  try {
+    const user = await api('/api/profile', {method:'POST', body: JSON.stringify({
+      name, risk_tolerance: document.getElementById('pf-risk').value,
+      investment_horizon: document.getElementById('pf-horizon').value,
+    })});
+    toast(`Profile "${user.name}" created.`);
+    document.getElementById('pf-name').value = '';
+    await loadProfiles();
+    selectUser(user);
+  } catch(e) { toast(e.message, true); }
+}
+
+async function loadProfiles() {
+  try {
+    const users = await api('/api/profile');
+    const box = document.getElementById('profileList');
+    if (!users.length) { box.innerHTML = '<div class="empty">No profiles yet.</div>'; return; }
+    box.innerHTML = users.map(u => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-weight:600;">${u.name}</div>
+          <div class="muted" style="font-size:12px;">${u.risk_tolerance} · ${u.investment_horizon}</div>
+        </div>
+        <button class="ghost" onclick='selectUser(${JSON.stringify(u)})'>${currentUser && currentUser.id===u.id ? "Selected" : "Select"}</button>
+      </div>`).join('');
+  } catch(e) { toast(e.message, true); }
+}
+
+function selectUser(u) {
+  currentUser = u;
+  updateUserChip();
+  loadProfiles();
+  loadPortfolio();
+  loadWatchlist();
+  toast(`Active profile: ${u.name}`);
+}
+
+// ---------------- Portfolio ----------------
+async function addPortfolioItem() {
+  if (!currentUser) { toast("Select a profile first.", true); return; }
+  try {
+    await api('/api/portfolio', {method:'POST', body: JSON.stringify({
+      user_id: currentUser.id,
+      symbol: document.getElementById('port-symbol').value,
+      quantity: parseFloat(document.getElementById('port-qty').value),
+      average_price: parseFloat(document.getElementById('port-price').value),
+    })});
+    toast("Holding added.");
+    loadPortfolio();
+  } catch(e) { toast(e.message, true); }
+}
+
+async function deletePortfolioItem(id) {
+  try { await api(`/api/portfolio/${id}`, {method:'DELETE'}); loadPortfolio(); }
+  catch(e) { toast(e.message, true); }
+}
+
+async function loadPortfolio() {
+  if (!currentUser) return;
+  try {
+    const items = await api(`/api/portfolio?user_id=${currentUser.id}`);
+    const box = document.getElementById('portfolioTable');
+    if (!items.length) { box.innerHTML = '<div class="empty">No holdings yet — add one above.</div>'; return; }
+    const total = items.reduce((s,i) => s + i.quantity*i.average_price, 0);
+    box.innerHTML = `<table><thead><tr><th>Symbol</th><th>Qty</th><th>Avg Price</th><th>Value</th><th>Allocation</th><th></th></tr></thead><tbody>
+      ${items.map(i => {
+        const val = i.quantity * i.average_price;
+        const pct = total ? (val/total*100).toFixed(1) : "0.0";
+        return `<tr><td>${i.symbol}</td><td>${i.quantity}</td><td>₹${i.average_price}</td><td>₹${val.toLocaleString()}</td><td>${pct}%</td>
+          <td><button class="ghost danger" onclick="deletePortfolioItem(${i.id})">Remove</button></td></tr>`;
+      }).join('')}
+      </tbody></table>`;
+  } catch(e) { toast(e.message, true); }
+}
+
+// ---------------- Watchlist ----------------
+async function addWatchlistItem() {
+  if (!currentUser) { toast("Select a profile first.", true); return; }
+  try {
+    await api('/api/watchlist', {method:'POST', body: JSON.stringify({
+      user_id: currentUser.id, symbol: document.getElementById('watch-symbol').value,
+    })});
+    toast("Added to watchlist.");
+    loadWatchlist();
+  } catch(e) { toast(e.message, true); }
+}
+async function loadWatchlist() {
+  if (!currentUser) return;
+  try {
+    const items = await api(`/api/watchlist?user_id=${currentUser.id}`);
+    const box = document.getElementById('watchlistTable');
+    box.innerHTML = items.length ? items.map(i => `<span class="pill">${i.symbol}</span>`).join(' ')
+      : '<div class="empty">No watchlist items yet.</div>';
+  } catch(e) { toast(e.message, true); }
+}
+
+// ---------------- Documents ----------------
+async function uploadDocument() {
+  const fileInput = document.getElementById('doc-file');
+  if (!fileInput.files.length) { toast("Choose a file first.", true); return; }
+  const fd = new FormData();
+  fd.append('symbol', document.getElementById('doc-symbol').value);
+  fd.append('file', fileInput.files[0]);
+  document.getElementById('uploadStatus').innerHTML = '<div class="skeleton" style="height:40px; margin-top:10px;"></div>';
+  try {
+    const res = await api('/api/documents/upload', {method:'POST', body: fd});
+    document.getElementById('uploadStatus').innerHTML = res.status === 'processed'
+      ? `<div class="sub" style="color:var(--green);">Processed — ${res.chunks} chunk(s) indexed for ${res.symbol}.</div>`
+      : `<div class="sub" style="color:var(--red);">Failed: ${res.reason || 'could not process file'}</div>`;
+    toast("Document processed.");
+    loadDocuments();
+  } catch(e) {
+    document.getElementById('uploadStatus').innerHTML = '';
+    toast(e.message, true);
+  }
+}
+async function loadDocuments() {
+  try {
+    const docs = await api('/api/documents');
+    const box = document.getElementById('documentsTable');
+    if (!docs.length) { box.innerHTML = '<div class="empty">No documents uploaded yet.</div>'; return; }
+    box.innerHTML = `<table><thead><tr><th>File</th><th>Symbol</th><th>Status</th><th>Chunks</th><th>Uploaded</th></tr></thead><tbody>
+      ${docs.map(d => `<tr><td>${d.filename}</td><td>${d.stock_symbol}</td>
+        <td><span class="status-dot ${d.status==='processed'?'ok':'bad'}"></span>${d.status}</td>
+        <td>${d.chunk_count}</td><td class="muted">${new Date(d.upload_date).toLocaleString()}</td></tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) { toast(e.message, true); }
+}
+
+// ---------------- Analyze: stock overview ----------------
+async function loadStock() {
+  const symbol = document.getElementById('stock-symbol').value;
+  const box = document.getElementById('stockOverview');
+  box.innerHTML = '<div class="card"><div class="skeleton"></div></div>';
+  try {
+    const data = await api(`/api/stock/${symbol}`);
+    renderStockOverview(data);
+    document.getElementById('analyzeCard').hidden = false;
+    document.getElementById('analysisResults').innerHTML = '';
+  } catch(e) { toast(e.message, true); box.innerHTML = ''; }
+}
+
+function renderStockOverview(data) {
+  const m = data.market;
+  const box = document.getElementById('stockOverview');
+  const changeColor = (m.change ?? 0) >= 0 ? 'var(--green)' : 'var(--red)';
+  box.innerHTML = `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+        <div>
+          <h2>${m.company_name} <span class="muted" style="font-weight:400;">(${m.symbol})</span></h2>
+          ${m.source !== 'live' ? '<span class="demo-flag">DEMO DATA</span>' : '<span class="chip">LIVE</span>'}
+          ${m.price != null ? `
+            <div style="font-size:32px; font-weight:800; margin-top:8px;">₹${m.price.toLocaleString()}</div>
+            <div style="color:${changeColor}; font-weight:600;">${m.change >= 0 ? '+' : ''}${m.change} (${m.change_pct}%)</div>
+            <div class="muted" style="font-size:13px; margin-top:6px;">Volume: ${m.volume?.toLocaleString() ?? '—'} · P/E: ${m.pe_ratio ?? '—'} · EPS: ${m.eps ?? '—'}</div>
+          ` : `<div class="muted" style="margin-top:8px;">Market data unavailable.</div>`}
+        </div>
+        <div style="flex: 1; min-width: 280px; max-width: 420px;"><canvas id="priceChartCanvas" height="140"></canvas></div>
+      </div>
+    </div>`;
+  if (data.price_history && data.price_history.length) {
+    const ctx = document.getElementById('priceChartCanvas');
+    if (priceChart) priceChart.destroy();
+    priceChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: data.price_history.map((_,i)=>i+1),
+        datasets: [{ data: data.price_history, borderColor: '#5b8def', backgroundColor: 'rgba(91,141,239,.1)', fill: true, tension: .3, pointRadius: 0 }] },
+      options: { plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{ticks:{color:'#93a0bd'}, grid:{color:'#263252'}}} }
+    });
+  }
+}
+
+// ---------------- Analyze: run pipeline ----------------
+async function analyzeStock() {
+  if (!currentUser) { toast("Select a profile first (Profile tab).", true); return; }
+  const symbol = document.getElementById('stock-symbol').value;
+  document.getElementById('analysisLoading').hidden = false;
+  document.getElementById('analysisResults').innerHTML = '';
+  document.getElementById('analyzeBtn').disabled = true;
+  try {
+    const data = await api(`/api/analyze/${symbol}?user_id=${currentUser.id}`, {method:'POST'});
+    renderAnalysis(data);
+    toast(`Analysis complete in ${data.analysis_time_ms} ms.`);
+  } catch(e) {
+    toast(e.message, true);
+    document.getElementById('analysisResults').innerHTML = `<div class="card"><div class="empty">Analysis failed: ${e.message}</div></div>`;
+  } finally {
+    document.getElementById('analysisLoading').hidden = true;
+    document.getElementById('analyzeBtn').disabled = false;
+  }
+}
+
+function agentCard(a, extra='') {
+  const status = a.status === 'available';
+  const sig = (a.signal || 'unknown').toLowerCase();
+  return `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">${a.agent}</h2>
+        <span class="status-dot ${status?'ok':'bad'}"></span>
+      </div>
+      <div style="margin:8px 0;"><span class="badge ${sig}">${a.signal}</span></div>
+      <div class="confidence-bar"><div style="width:${a.confidence}%"></div></div>
+      <div class="muted" style="font-size:12px; margin-bottom:6px;">Confidence: ${a.confidence}%</div>
+      <div style="font-size:13px; margin-bottom:6px;">${a.summary}</div>
+      ${(a.key_factors||[]).slice(0,4).map(f => `<div class="factor">${f}</div>`).join('')}
+      ${extra}
+    </div>`;
+}
+
+function renderAnalysis(data) {
+  const { technical, fundamental, sentiment, risk, final } = data;
+  const box = document.getElementById('analysisResults');
+
+  const finalSigClass = final.final_signal.toLowerCase();
+  const whyItems = [
+    ...final.positive_factors.map(f => `<div class="why-item pos">${f}</div>`),
+    ...final.risk_factors.map(f => `<div class="why-item risk">${f}</div>`),
+  ].join('') || '<div class="muted">No agent factors available.</div>';
+
+  const sources = (fundamental.sources || []).map(s => `
+    <div style="padding:8px 0; border-bottom:1px solid var(--border);">
+      <div style="font-weight:600; font-size:13px;">${s.document_name} ${s.is_demo ? '<span class="demo-flag">DEMO</span>' : ''}</div>
+      <div class="muted" style="font-size:13px; margin-top:2px;">"${s.excerpt}"</div>
+      ${s.relevance_score != null ? `<div class="muted" style="font-size:11px;">relevance: ${s.relevance_score}</div>` : ''}
+    </div>`).join('') || '<div class="empty">Fundamental document unavailable.</div>';
+
+  box.innerHTML = `
+    <div class="card final-card">
+      <div class="sub">FINAL INTELLIGENCE</div>
+      <div class="final-signal"><span class="badge ${finalSigClass}" style="font-size:28px; padding:6px 18px;">${final.final_signal}</span></div>
+      <div>Confidence: <strong>${final.confidence}%</strong></div>
+      <div class="confidence-bar" style="max-width:320px;"><div style="width:${final.confidence}%"></div></div>
+      ${final.confidence_notes.map(n => `<div class="muted" style="font-size:12px; margin-top:4px;">${n}</div>`).join('')}
+      <div style="margin-top:14px; font-size:14px;">${final.reason}</div>
+      <div style="margin-top:10px; font-weight:600;">Personalized action</div>
+      <div style="font-size:14px;">${final.personalized_action}</div>
+      <div style="margin-top:14px; font-weight:600;">WHY?</div>
+      ${whyItems}
+      <div class="disclaimer">${final.disclaimer}</div>
+      <details><summary>View Analysis Details</summary>
+        <pre>${JSON.stringify({technical, fundamental, sentiment, risk, final}, null, 2)}</pre>
+      </details>
+    </div>
+
+    <div class="grid grid-4">
+      ${agentCard(technical)}
+      ${agentCard(fundamental)}
+      ${agentCard(sentiment, sentiment.data_note ? `<div class="muted" style="font-size:11px; margin-top:4px;">${sentiment.data_note}</div>` : '')}
+      ${riskAgentCard(risk)}
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>Portfolio Risk</h2>
+        <div class="sub">Concentration for this position vs. total portfolio.</div>
+        <canvas id="allocChartCanvas" height="180"></canvas>
+        <div class="muted" style="font-size:13px; margin-top:10px;">
+          Position value: ₹${risk.position_value.toLocaleString()} · Portfolio value: ₹${risk.total_portfolio_value.toLocaleString()}
+        </div>
+      </div>
+      <div class="card">
+        <h2>Sources</h2>
+        <div class="sub">Documents used by the Fundamental Agent.</div>
+        ${sources}
+      </div>
+    </div>
+  `;
+
+  const ctx = document.getElementById('allocChartCanvas');
+  if (allocChart) allocChart.destroy();
+  const other = Math.max(0, 100 - risk.portfolio_concentration_pct);
+  allocChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: [data.symbol, 'Rest of portfolio'], datasets: [{ data: [risk.portfolio_concentration_pct, other], backgroundColor: ['#5b8def', '#263252'] }] },
+    options: { plugins: { legend: { labels: { color: '#93a0bd' } } } }
+  });
+}
+
+function riskAgentCard(risk) {
+  const level = (risk.risk_level || 'low').toLowerCase();
+  return `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">Risk Agent</h2>
+        <span class="status-dot ok"></span>
+      </div>
+      <div style="margin:8px 0;"><span class="badge ${level}">${risk.risk_level} RISK</span></div>
+      <div class="muted" style="font-size:12px; margin-bottom:6px;">Concentration: ${risk.portfolio_concentration_pct}%</div>
+      <div style="font-size:13px; margin-bottom:6px;">${risk.summary}</div>
+      ${(risk.concerns||[]).slice(0,4).map(f => `<div class="factor">${f}</div>`).join('')}
+      <div style="margin-top:8px; font-size:12px; color: var(--accent);">${risk.recommendation}</div>
+    </div>`;
+}
+
+// ---------------- History ----------------
+async function loadHistory() {
+  if (!currentUser) { document.getElementById('historyTable').innerHTML = '<div class="empty">Select a profile first.</div>'; return; }
+  try {
+    const rows = await api(`/api/analysis/history?user_id=${currentUser.id}`);
+    const box = document.getElementById('historyTable');
+    if (!rows.length) { box.innerHTML = '<div class="empty">No past analyses for this profile yet.</div>'; return; }
+    box.innerHTML = `<table><thead><tr><th>Date</th><th>Symbol</th><th>Signal</th><th>Confidence</th><th></th></tr></thead><tbody>
+      ${rows.map(r => `<tr>
+        <td class="muted">${new Date(r.created_at).toLocaleString()}</td>
+        <td>${r.symbol}</td>
+        <td><span class="badge ${r.final_result.final_signal.toLowerCase()}">${r.final_result.final_signal}</span></td>
+        <td>${r.confidence}%</td>
+        <td><button class="ghost" onclick="openHistoryItem(${r.id})">View</button></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch(e) { toast(e.message, true); }
+}
+async function openHistoryItem(id) {
+  try {
+    const r = await api(`/api/analysis/${id}`);
+    document.getElementById('historyDetail').innerHTML = `
+      <div class="card">
+        <h2>${r.symbol} — ${new Date(r.created_at).toLocaleString()}</h2>
+        <details open><summary>View Analysis Details</summary>
+          <pre>${JSON.stringify(r, null, 2)}</pre>
+        </details>
+      </div>`;
+  } catch(e) { toast(e.message, true); }
+}
+
+// ---------------- Metrics ----------------
+async function loadMetrics() {
+  try {
+    const m = await api('/api/metrics');
+    const box = document.getElementById('metricsGrid');
+    const items = [
+      ["Total Analyses", m.total_analyses],
+      ["Successful", m.successful_analyses],
+      ["Failed", m.failed_analyses],
+      ["Avg Time", `${(m.average_analysis_time_ms/1000).toFixed(2)}s`],
+      ["Avg Confidence", `${m.average_confidence}%`],
+    ];
+    box.innerHTML = items.map(([label,val]) => `
+      <div class="card" style="text-align:center;">
+        <div class="muted" style="font-size:12px;">${label}</div>
+        <div style="font-size:26px; font-weight:800; margin-top:6px;">${val}</div>
+      </div>`).join('');
+  } catch(e) { toast(e.message, true); }
+}
+
+// ---------------- Init ----------------
+async function init() {
+  buildNav();
+  showTab('profile');
+  let symbols = SYMBOLS_FALLBACK;
+  try { const r = await api('/api/symbols'); if (r.symbols?.length) symbols = r.symbols; } catch(e) {}
+  fillSymbolSelects(symbols);
+  loadProfiles();
+  loadDocuments();
+}
+init();
+</script>
+</body>
+</html>
